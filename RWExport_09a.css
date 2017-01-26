@@ -2,8 +2,8 @@
 
    main.css file for RWExport-To-HTML.ps1
    by EightBitz
-   Version 0.9a
-   2017-01-26, 4:00 AM CST
+   Version pending
+   time stamp pending
    
    This file must accompany the resulting HTML file
    as it defines the formatting of the HTML file.
@@ -14,10 +14,12 @@
 /* Realm Title */
 H1 {
    font-weight:bold;
-   color:black;
+   color:White;
+   background: #466368;
+   background: radial-gradient(#648880, #293f50);
    letter-spacing:1pt;
    word-spacing:2pt;
-   font-size:30px;
+   font-size:60px;
    text-align:center;
    font-family:helvetica, sans-serif;line-height:1;
    margin:0px;
@@ -42,8 +44,9 @@ H2 {
 /* Topic Name */
 H3 {
    font-weight:bold;
-   color:black;
-   background-color:#CCCCCC;
+   color:white;
+   background: #466368;
+   background: linear-gradient(to right bottom, #648880, #293f50);
    letter-spacing:1pt;
    word-spacing:2pt;
    font-size:25px;
