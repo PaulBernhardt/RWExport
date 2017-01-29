@@ -1273,7 +1273,7 @@ Function ComposeDetails ($ExportedDetails,$RealmTitleCSS,$RealmDetailsCSS) {
    if (($CoverArt -ne $null) -and ($CoverArt -ne "")) {
       $CoverArtScale = 'width="100%"'
       $CoverArt = '<img ' + $CoverArtSCale + ' src="data:image/png;base64,' + $CoverArt + '">'
-      # $RealmDetails = $CoverArt
+      $RealmDetails = $CoverArt
    } # if (($RealmTitle -ne $null) -and ($RealmTitle -ne ""))
 
    $RealmTitle = $ExportedDetails.name
