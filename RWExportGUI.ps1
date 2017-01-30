@@ -10,8 +10,36 @@ by EightBitz
 
 # https://blogs.technet.microsoft.com/heyscriptingguy/2011/07/24/create-a-simple-graphical-interface-for-a-powershell-script/
 
+Add-Type @'
+public class objCommand
+{
+    public string Script;
+    public string Source;
+    public string Destination;
+    public int Sort;
+    public bool Prefix;
+    public bool Suffix;
+    public bool Details;
+    public bool Indent;
+    public bool SeparateSnippets;
+    public bool InlineStats;
+    public int SimpleImageScale;
+    public int SmartImageScale;
+    public bool KeepStyles;
+    public bool ExtractFiles;
+    public string CSSFileName;
+    public bool SplitTopics;
+    public string Log;
+}
+'@
+
 Function BuildCommandLine ($Script,$Source,$Destination,$Sort,$Simple,$Smart,$CSSFile,$Prefix,$Suffix,$Details,$Indent,$Inline,$Keep,$Separate,$Split,$Export,$Log,$LogName) {
-   $CommandLine = "&(""$Script"") -Source '$Source' -Destination '$Destination' -Sort $Sort -SimpleImageScale $Simple -SmartImageScale $Smart -CSSFileName '$CSSFile'"
+   if (-not $Script.startswith('&("')) {$Script = "&(""$Script"")"}
+   if (-not ($Source.Startswith("'")) -or ($Source.Startswith('"'))) {$Source = "'$Source'"}
+   if (-not ($Destination.Startswith("'")) -or ($Destination.Startswith('"'))) {$Destination = "'$Destination'"}
+   if (-not ($CSSFile.Startswith("'")) -or ($CSSFile.Startswith('"'))) {$CSSFile = "'$CSSFile'"}
+   if (-not ($LogName.Startswith("'")) -or ($LogName.Startswith('"'))) {$LogName = "'$LogName'"}
+   $CommandLine = "$Script -Source $Source -Destination $Destination -Sort $Sort -SimpleImageScale $Simple -SmartImageScale $Smart -CSSFileName $CSSFile"
    if ($Prefix) {$CommandLine = $CommandLine + " -Prefix"}
    if ($Suffix) {$CommandLine = $CommandLine + " -Suffix"}
    if ($Details) {$CommandLine = $CommandLine + " -Details"}
@@ -21,10 +49,74 @@ Function BuildCommandLine ($Script,$Source,$Destination,$Sort,$Simple,$Smart,$CS
    if ($Keep) {$CommandLine = $CommandLine + " -KeepStyles"}
    if ($Split) {$CommandLine = $CommandLine + " -SplitTopics"}
    if ($Export) {$CommandLine = $CommandLine + " -ExtractFiles"}
-   if ($Log) {$CommandLine = $CommandLine + " -Log '$LogName'"}
+   if ($Log) {$CommandLine = $CommandLine + " -Log $LogName"}
    Return $CommandLine
 } # Function BuildCommandLine
 
+Function LoadCommandLine ($CommandLine) {
+   $Command = New-Object objCommand
+   $Index1 = 0
+   $Index2 = $CommandLine.IndexOf('.ps1")') + 6
+   $Length = $Index2 - $Index1
+   $Command.Script = $CommandLine.Substring($Index1,$Length)
+   
+   $Index1 = $CommandLine.IndexOf(" -Source") + 9
+   $Index2 = $CommandLine.IndexOf(".rwoutput'") + 10
+   $Length = $Index2 - $Index1
+   $Command.Source = $CommandLine.Substring($Index1,$Length)
+
+   $Index1 = $CommandLine.IndexOf(" -Destination") + 14
+   $Index2 = $CommandLine.IndexOf(".html'") + 6
+   $Length = $Index2 - $Index1
+   $Command.Destination = $CommandLine.Substring($Index1,$Length)
+
+   if ($CommandLine.contains(" -Sort ")) {
+      $Index1 = $CommandLine.IndexOf(" -Sort") + 7
+      $Index2 = $CommandLine.IndexOf(" ",$Index1)
+      $Length = $Index2 - $Index1
+      $Command.Sort = $CommandLine.Substring($Index1,$Length)
+   } # if ($CommandLine.contains(" -Sort "))
+
+   if ($CommandLine.contains(" -SimpleImageScale")) {
+      $Index1 = $CommandLine.IndexOf(" -SimpleImageScale ") + 19
+      $Index2 = $CommandLine.IndexOf(" ",$Index1)
+      $Length = $Index2 - $Index1
+      $Command.SimpleImageScale = $CommandLine.Substring($Index1,$Length)
+   } # if ($CommandLine.contains(" -SimpleImageScale "))
+
+   if ($CommandLine.contains(" -SmartImageScale ")) {
+      $Index1 = $CommandLine.IndexOf(" -SmartImageScale ") + 18
+      $Index2 = $CommandLine.IndexOf(" ",$Index1)
+      $Length = $Index2 - $Index1
+      $Command.SmartImageScale = $CommandLine.Substring($Index1,$Length)
+   } # if ($CommandLine.contains(" -SmartImageScale "))
+
+   if ($CommandLine.Contains(" -CSSFileName")) {
+      $Index1 = $CommandLine.IndexOf(" -CSSFileName") + 14
+      $Index2 = $CommandLine.IndexOf(".css'") + 5
+      $Length = $Index2 - $Index1
+      $Command.CSSFileName = $CommandLine.Substring($Index1,$Length)
+   } # if ($CommandLine.Contains(" -CSSFileName "))
+
+   if ($CommandLine.Contains(" -Log")) {
+      $Index1 = $CommandLine.IndexOf(" -Log") + 6
+      $Index2 = $CommandLine.IndexOf(".log'") + 5
+      $Length = $Index2 - $Index1
+      $Command.Log = $CommandLine.Substring($Index1,$Length)
+   } # if ($CommandLine.Contains(" -Log "))
+
+   if ($CommandLine.Contains(" -Prefix")) {$Command.Prefix = $true} else {$Command.Prefix = $false}
+   if ($CommandLine.Contains(" -Suffix")) {$Command.Suffix = $true} else {$Command.Suffix = $false}
+   if ($CommandLine.Contains(" -Details")) {$Command.Details = $true} else {$Command.Details = $false}
+   if ($CommandLine.Contains(" -Indent")) {$Command.Indent = $true} else {$Command.Indent = $false}
+   if ($CommandLine.Contains(" -SeparateSnippets")) {$Command.SeparateSnippets = $true} else {$Command.SeparateSnippets = $false}
+   if ($CommandLine.Contains(" -InlineStats")) {$Command.InlineStats = $true} else {$Command.InlineStats = $false}
+   if ($CommandLine.Contains(" -KeepStyles")) {$Command.KeepStyles = $true} else {$Command.KeepStyles = $false}
+   if ($CommandLine.Contains(" -ExtractFiles")) {$Command.ExtractFiles = $true} else {$Command.ExtractFiles = $false}
+   if ($CommandLine.Contains(" -SplitTopics")) {$Command.SplitTopics = $true} else {$Command.SplitTopics = $false}
+   
+   Return $Command
+} # Function BuildCommandLine
 
 #Generated Form Function
 function GenerateForm {
@@ -103,6 +195,7 @@ function GenerateForm {
    $RunButton = New-Object System.Windows.Forms.Button
    $SaveButton = New-Object System.Windows.Forms.Button
    $LoadButton = New-Object System.Windows.Forms.Button
+   $DefaultsButton = New-Object System.Windows.Forms.Button
 
    $InitialFormWindowState = New-Object System.Windows.Forms.FormWindowState
    #endregion Generated Form Objects
@@ -113,13 +206,9 @@ function GenerateForm {
    #Provide Custom Code for events specified in PrimalForms.
 
       $handler_ScriptButton_Click={
-         #TODO: Place custom script here
-         # 
-
          $OpenFileDialog = New-Object System.Windows.Forms.OpenFileDialog
          $OpenFileDialog.initialDirectory = ".\"
          $OpenFileDialog.filter = “PowerShell Scripts (*.ps1)| *.ps1”
-         # $OpenFileDialog.showhelp = $true
          [void]$OpenFileDialog.ShowDialog()
          $ScriptText.Text = $OpenFileDialog.filename.ToString()
          $SortMethod = $SortComboBox.SelectedIndex + 1
@@ -134,13 +223,9 @@ function GenerateForm {
       } # $handler_ScriptText_LostFocus
 
       $handler_SourceButton_Click={
-         #TODO: Place custom script here
-         
-
          $OpenFileDialog = New-Object System.Windows.Forms.OpenFileDialog
          $OpenFileDialog.initialDirectory = ".\"
          $OpenFileDialog.filter = “Realm Works Exports (*.RWOutput)| *.RWOutput”
-         # $OpenFileDialog.showhelp = $true
          [void]$OpenFileDialog.ShowDialog()
          $SourceText.Text = $OpenFileDialog.filename.ToString()
          $SortMethod = $SortComboBox.SelectedIndex + 1
@@ -149,8 +234,6 @@ function GenerateForm {
       } # $handler_SourceButton_Click
 
       $handler_DestinationButton_Click={
-         #TODO: Place custom script here
-
          if (($SplitTopicsCheck.Checked) -or ($ExtractFilesCheck.Checked)) {
             $SaveFolderDialog = New-Object System.Windows.Forms.FolderBrowserDialog
             $CurrentPath = Get-Item ".\"
@@ -171,19 +254,13 @@ function GenerateForm {
       } # $handler_DestinationButton_Click
 
       $handler_CSSButton_Click={
-         #TODO: Place custom script here
-         
-
          $OpenFileDialog = New-Object System.Windows.Forms.OpenFileDialog
          $OpenFileDialog.initialDirectory = ".\"
          $OpenFileDialog.filter = “Cascading Style Sheets (*.css)| *.css”
-         # $OpenFileDialog.showhelp = $true
          [void]$OpenFileDialog.ShowDialog()
          $CSSFileName = $OpenFileDialog.filename
          $SplitCSS = $CSSFileName.Split("\")
-
          $CSSText.Text = $SplitCSS[$SplitCSS.Count-1]
-
          $SortMethod = $SortComboBox.SelectedIndex + 1
          $CommandLine = BuildCommandLine $ScriptText.Text $SourceText.Text $DestinationText.Text $SortMethod $SimpleImgText.Text $SmartImgText.Text $CSSText.Text $PrefixCheck.Checked $SuffixCheck.Checked $DetailsCheck.checked $IndentCheck.Checked $InlineStatsCheck.Checked $KeepStylesCheck.Checked $SeparateCheck.Checked $SplitTopicsCheck.Checked $ExtractFilesCheck.Checked $LogCheck.Checked $LogText.Text
          $CommandText.Text = $CommandLine
@@ -196,9 +273,6 @@ function GenerateForm {
       } # $handler_CSSText_LostFocus
 
       $handler_LogButton_Click={
-         #TODO: Place custom script here
-         
-
          $SaveFileDialog = New-Object System.Windows.Forms.SaveFileDialog
          $SaveFileDialog.initialDirectory = ".\"
          $SaveFileDialog.filter = “Log Files (*.log)| *.log”
@@ -249,6 +323,29 @@ function GenerateForm {
 
       $handler_RWEXportForm_Shown={
          $SortMethod = $SortComboBox.SelectedIndex + 1
+         if (Test-Path ".\Defaults.ps1") {
+            [array]$ScriptFile = Get-Content ".\Defaults.ps1"
+            $LoadedCommand = LoadCommandLine $ScriptFile[0]
+            $ScriptText.Text = $LoadedCommand.Script
+            $SourceText.Text = $LoadedCommand.Source
+            $DestinationText.Text = $LoadedCommand.Destination
+            $SortComboBox.SelectedIndex = $LoadedCommand.Sort - 1
+            $SortMethod = $LoadedCommand.Sort
+            $SimpleImgText.Text = $LoadedCommand.SimpleImageScale
+            $SmartImgText.Text = $LoadedCommand.SmartImageScale
+            $CSSText.Text = $LoadedCommand.CSSFileName
+            if ($LoadedCommand.Prefix) {$PrefixCheck.Checked = $true} else {$PrefixCheck.Checked = $false}
+            if ($LoadedCommand.Suffix) {$SuffixCheck.Checked = $true} else {$SuffixCheck.Checked = $false}
+            if ($LoadedCommand.Details) {$DetailsCheck.Checked = $true} else {$DetailsCheck.Checked = $false}
+            if ($LoadedCommand.Indent) {$IndentCheck.Checked = $true} else {$IndentCheck.Checked = $false}
+            if ($LoadedCommand.InlineStats) {$InlineStatsCheck.Checked = $true} else {$InlineStatsCheck.Checked = $false}
+            if ($LoadedCommand.KeepStyles) {$KeepStylesCheck.Checked = $true} else {$KeepStylesCheck.Checked = $false}
+            if ($LoadedCommand.SeparateSnippets) {$SeparateCheck.Checked = $true} else {$SeparateCheck.Checked = $false}
+            if ($LoadedCommand.SplitTopics) {$SplitTopicsCheck.Checked = $true} else {$SplitTopicsCheck.Checked = $false}
+            if ($LoadedCommand.ExtractFiles) {$ExtractFilesCheck.Checked = $true} else {$ExtractFilesCheck.Checked = $false}
+            if ($LoadedCommand.Log) {$LogCheck.Checked = $true;$LogText.Text = $LoadedCommand.Log} else {$LogCheck.Checked = $false;$LogText.Text = ""}
+         } # if (Test-Path ".\Default.ps1")
+
          $CommandLine = BuildCommandLine $ScriptText.Text $SourceText.Text $DestinationText.Text $SortMethod $SimpleImgText.Text $SmartImgText.Text $CSSText.Text $PrefixCheck.Checked $SuffixCheck.Checked $DetailsCheck.checked $IndentCheck.Checked $InlineStatsCheck.Checked $KeepStylesCheck.Checked $SeparateCheck.Checked $SplitTopicsCheck.Checked $ExtractFilesCheck.Checked $LogCheck.Checked $LogText.Text
          $CommandText.Text = $CommandLine
       }
@@ -260,9 +357,6 @@ function GenerateForm {
       } # $handler_RunButton_Click
 
       $handler_SaveButton_Click={
-         #TODO: Place custom script here
-         
-
          $SaveFileDialog = New-Object System.Windows.Forms.SaveFileDialog
          $SaveFileDialog.initialDirectory = ".\"
          $SaveFileDialog.filter = “PowerShell Files (*.ps1)| *.ps1”
@@ -272,7 +366,39 @@ function GenerateForm {
       } # $handler_SaveButton_Click
 
       $handler_LoadButton_Click={
+         $LoadedCommand = New-Object objCommand
+         $OpenFileDialog = New-Object System.Windows.Forms.OpenFileDialog
+         $OpenFileDialog.initialDirectory = ".\"
+         $OpenFileDialog.filter = “PowerShell Scripts (*.ps1)| *.ps1”
+         [void]$OpenFileDialog.ShowDialog()
+
+         [array]$ScriptFile = Get-Content $OpenFileDialog.filename
+         $LoadedCommand = LoadCommandLine $ScriptFile[0]
+         $ScriptText.Text = $LoadedCommand.Script
+         $SourceText.Text = $LoadedCommand.Source
+         $DestinationText.Text = $LoadedCommand.Destination
+         $SortComboBox.SelectedIndex = $LoadedCommand.Sort - 1
+         $SortMethod = $LoadedCommand.Sort
+         $SimpleImgText.Text = $LoadedCommand.SimpleImageScale
+         $SmartImgText.Text = $LoadedCommand.SmartImageScale
+         $CSSText.Text = $LoadedCommand.CSSFileName
+         if ($LoadedCommand.Prefix) {$PrefixCheck.Checked = $true} else {$PrefixCheck.Checked = $false}
+         if ($LoadedCommand.Suffix) {$SuffixCheck.Checked = $true} else {$SuffixCheck.Checked = $false}
+         if ($LoadedCommand.Details) {$DetailsCheck.Checked = $true} else {$DetailsCheck.Checked = $false}
+         if ($LoadedCommand.Indent) {$IndentCheck.Checked = $true} else {$IndentCheck.Checked = $false}
+         if ($LoadedCommand.InlineStats) {$InlineStatsCheck.Checked = $true} else {$InlineStatsCheck.Checked = $false}
+         if ($LoadedCommand.KeepStyles) {$KeepStylesCheck.Checked = $true} else {$KeepStylesCheck.Checked = $false}
+         if ($LoadedCommand.SeparateSnippets) {$SeparateCheck.Checked = $true} else {$SeparateCheck.Checked = $false}
+         if ($LoadedCommand.SplitTopics) {$SplitTopicsCheck.Checked = $true} else {$SplitTopicsCheck.Checked = $false}
+         if ($LoadedCommand.ExtractFiles) {$ExtractFilesCheck.Checked = $true} else {$ExtractFilesCheck.Checked = $false}
+         if ($LoadedCommand.Log) {$LogCheck.Checked = $true;$LogText.Text = $LoadedCommand.Log} else {$LogCheck.Checked = $false;$LogText.Text = ""}
+
+         $CommandLine = BuildCommandLine $ScriptText.Text $SourceText.Text $DestinationText.Text $SortMethod $SimpleImgText.Text $SmartImgText.Text $CSSText.Text $PrefixCheck.Checked $SuffixCheck.Checked $DetailsCheck.checked $IndentCheck.Checked $InlineStatsCheck.Checked $KeepStylesCheck.Checked $SeparateCheck.Checked $SplitTopicsCheck.Checked $ExtractFilesCheck.Checked $LogCheck.Checked $LogText.Text
       } # $handler_LoadButton_Click
+
+      $handler_DefaultsButton_Click={
+         $CommandText.Text | Out-File ".\Defaults.ps1"
+      } # $handler_DefaultsButton_Click
 
       $OnLoadForm_StateCorrection={
          #Correct the initial state of the form to prevent the .Net maximized form issue
@@ -537,7 +663,7 @@ function GenerateForm {
 
    $Tab = $Tab + 1
    $SuffixCheck.TabIndex = $Tab
-   $relativex = $x2 # $relativex + $Width + $xpadding
+   $relativex = $x2
    $relativey = $relativey
    $SuffixCheck.Location = New-Object System.Drawing.Size($relativex,$relativey)
    $SuffixCheck.Name = “SuffixCheck”
@@ -561,7 +687,7 @@ function GenerateForm {
 
    $Tab = $Tab + 1
    $DetailsCheck.TabIndex = $Tab
-   $relativex = $x3 # $relativex + $Width + $xpadding
+   $relativex = $x3
    $relativey = $relativey
    $DetailsCheck.Location = New-Object System.Drawing.Size($relativex,$relativey)
    $DetailsCheck.Name = “DetailsCheck”
@@ -585,7 +711,7 @@ function GenerateForm {
 
    $Tab = $Tab + 1
    $IndentCheck.TabIndex = $Tab
-   $relativex = $x1 # $relativex + $Width + $xpadding
+   $relativex = $x1
    $relativey = $relativey + $height
    $IndentCheck.Location = New-Object System.Drawing.Size($relativex,$relativey)
    $IndentCheck.Name = “IndentCheck”
@@ -609,8 +735,8 @@ function GenerateForm {
 
    $Tab = $Tab + 1
    $InlineStatsCheck.TabIndex = $Tab
-   $relativex = $x3 # $relativex + $Width + $xpadding
-   $relativey = $relativey # + $height + $y2padding
+   $relativex = $x3
+   $relativey = $relativey
    $InlineStatsCheck.Location = New-Object System.Drawing.Size($relativex,$relativey)
    $InlineStatsCheck.Name = “InlineStatsCheck”
    $Width = 15
@@ -632,8 +758,8 @@ function GenerateForm {
 
    $Tab = $Tab + 1
    $KeepStylesCheck.TabIndex = $Tab
-   $relativex = $x1 # $relativex + $Width + $xpadding
-   $relativey = $relativey + $height # + $height + $y2padding
+   $relativex = $x1
+   $relativey = $relativey + $height
    $KeepStylesCheck.Location = New-Object System.Drawing.Size($relativex,$relativey)
    $KeepStylesCheck.Name = “KeepStylesCheck”
    $Width = 15
@@ -655,7 +781,7 @@ function GenerateForm {
 
    $Tab = $Tab + 1
    $SeparateCheck.TabIndex = $Tab
-   $relativex = $x3 # $relativex + $Width + $xpadding
+   $relativex = $x3
    $relativey = $relativey
    $SeparateCheck.Location = New-Object System.Drawing.Size($relativex,$relativey)
    $SeparateCheck.Name = “SeparateCheck”
@@ -679,7 +805,7 @@ function GenerateForm {
 
    $Tab = $Tab + 1
    $SplitTopicsCheck.TabIndex = $Tab
-   $relativex = $x1 # $relativex + $Width + $xpadding
+   $relativex = $x1
    $relativey = $relativey + $height
    $SplitTopicsCheck.Location = New-Object System.Drawing.Size($relativex,$relativey)
    $SplitTopicsCheck.Name = “SplitTopicsCheck”
@@ -702,7 +828,7 @@ function GenerateForm {
 
    $Tab = $Tab + 1
    $ExtractFilesCheck.TabIndex = $Tab
-   $relativex = $x3 # $relativex + $Width + $xpadding
+   $relativex = $x3
    $relativey = $relativey
    $ExtractFilesCheck.Location = New-Object System.Drawing.Size($relativex,$relativey)
    $ExtractFilesCheck.Name = “ExtractFilesCheck”
@@ -749,18 +875,18 @@ function GenerateForm {
    $CommandText.Text = “.\RWExport-To-HTML.ps1”
 
    $RunButton.TabIndex = $Tab
-   $relativex = 215
+   $relativex = 165
    $relativey = $relativey + $Height + 10
    $RunButton.Location = New-Object System.Drawing.Size($relativex,$relativey)
    $RunButton.Name = “RunButton”
-   $Width = 210
+   $Width = 320
    $Height = 25
    $RunButton.Size = New-Object System.Drawing.Size($Width,$Height)
    $RunButton.Text = “Run Script”
    $RunButton.add_Click($handler_RunButton_Click)
 
    $SaveButton.TabIndex = $Tab
-   $relativex = 215
+   $relativex = $relativex
    $relativey = $relativey + $Height + $ypadding
    $SaveButton.Location = New-Object System.Drawing.Size($relativex,$relativey)
    $SaveButton.Name = “SaveButton”
@@ -780,6 +906,17 @@ function GenerateForm {
    $LoadButton.Size = New-Object System.Drawing.Size($Width,$Height)
    $LoadButton.Text = “Load Script”
    $LoadButton.add_Click($handler_LoadButton_Click)
+
+   $DefaultsButton.TabIndex = $Tab
+   $relativex = $relativex + $width + $xpadding
+   $relativey = $relativey
+   $DefaultsButton.Location = New-Object System.Drawing.Size($relativex,$relativey)
+   $DefaultsButton.Name = “DefaultsButton”
+   $Width = 100
+   $Height = 25
+   $DefaultsButton.Size = New-Object System.Drawing.Size($Width,$Height)
+   $DefaultsButton.Text = “Save Defaults”
+   $DefaultsButton.add_Click($handler_DefaultsButton_Click)
 
    $RWExportForm.Controls.Add($ScriptButton)
    $RWExportForm.Controls.Add($ScriptText)
@@ -822,6 +959,7 @@ function GenerateForm {
    $RWExportForm.Controls.Add($RunButton)
    $RWExportForm.Controls.Add($SaveButton)
    $RWExportForm.Controls.Add($LoadButton)
+   $RWExportForm.Controls.Add($DefaultsButton)
    # endregion Generated Form Code
 
    # Save the initial state of the form
